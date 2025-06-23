@@ -1,0 +1,636 @@
+---
+title: "Итоговый проект по анализу данных"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+```
+
+
+```{r download}
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(lmerTest)
+
+setwd('C:/Users/irina/Documents/АНАЛИЗ ДАННЫХ/проект')
+
+answers <- read_csv('answers.csv')
+participants_info <- read_csv('participants_info.csv')
+sentences <- read_csv('sentences.csv')
+```
+
+
+# Факторы, регулирующие эллипсис прямого объекта в русском языке
+
+## 1. Введение
+
+Тема проекта - "Факторы, регулирующие эллипсис прямого объекта в русском языке". В рамках проекта исследовалось, влияет ли наличие отрицания и/или повелительное наклонение глагола, а также некоторые другие факторы на опущение прямого объекта в русском языке. Так, предполагалось, что предложение (2), содержащее отрицание, и (3), содержащее императив, могут оказаться для носителей более приемлемыми, чем предложение (1), т.е. опускать объект в условиях (2) и (3) лучше, чем в условии (1):
+
+(1) Петя постоянно просит (pro) о помощи, даже если может всё сделать сам.
+(2) Петя никогда не просит (pro) о помощи, если может всё сделать сам.
+(3) Лучше почаще проси (pro) о помощи, не мучайся сам!
+
+Ранее (в моем мини-исследовании 2022 года) было выявлено, что такие факторы потенциально могут влиять на возможность депиктивов при опущенных прямых объектах - предложения (2) и (3) оказывались для носителей значительно лучше, чем (1):
+
+(1) Вася часто ест (pro) горячим.
+(2) Ну нельзя же есть (pro) сырым! Лучше подожди, пока я приготовлю.
+(3) Подожди, не ешь (pro) горячим, обожжешься!
+
+Данное исследование пытается более аккуратно обойтись с переменными - в предыдущем я просто составляла стимулы рандомно, комбинируя разные условия, а сейчас я пытаюсь сделать их более контролируемыми, сбалансировать разные условия, добавить филлеры и т.д.
+
+**Переменные:**
+
+Зависимая переменная - средняя оценка приемлемости предложения носителями.
+
+Переменные, которыми я манипулирую - синтаксический контекст предложения:
+
+1) отрицание (принимает два значения - +neg, -neg)
+2) императив (принимает два значения - +imp, -imp)
+3) наличие упоминания этого же прямого объекта где-то еще в контексте (принимает два значения - +dobj, -dobj)
+4) число глагола (sg, pl)
+
+**Гипотезы исследования:**
+
+**Неинтересные гипотезы:**
+
+Гипотеза про участников:  
+H0: средние оценки у людей с лингвистическим образованием и без лингвистического образования будут совпадать  
+H1: средние оценки у людей с лингвистическим образованием и без лингвистического образования будут различаться  
+
+Гипотеза про предложения:  
+H0: средние оценки филлеров и стимулов будут совпадать  
+H1: средняя оценка филлеров будет выше средней оценки стимулов  
+
+**Интересные гипотезы - про факторы:**
+
+Отрицание:  
+H0: средняя оценка предложений с +neg равна средней оценке предложений с -neg  
+H1: средняя оценка предложений с +neg больше средней оценки предложений с -neg  
+
+Императив:  
+H0: средняя оценка предложений с +imp равна средней оценке предложений с -imp  
+H1: средняя оценка предложений с +imp больше средней оценки предложений с -imp  
+
+Наличие упоминания прямого объекта:  
+H0: средняя оценка предложений с +dobj равна средней оценке предложений с -dobj  
+H1: средняя оценка предложений с +dobj больше средней оценки предложений с -dobj  
+
+Число глагола:  
+H0: средняя оценка предложений с pl равна средней оценке предложений с sg  
+H1: средняя оценка предложений с pl больше средней оценки предложений с sg  
+
+
+Подытоживания, **цель исследования** - выявить факторы, влияющие на опущение прямого объекта в русском языке, и основные гипотезы связаны с наличием зависимости оценок приемлемости предложения от конкретного фактора.
+
+## 2. Метод
+
+## 2.1. Данные
+
+Все предложения:
+
+```{r sentences}
+sentences
+```
+
+Балансировалось количество предложений с разными значениями одного и того же фактора:
+
+```{r stimuli}
+sentences <- sentences %>% 
+  mutate(obj_mentioned = as.factor(obj_mentioned)) %>% 
+  mutate(imp = as.factor(imp)) %>% 
+  mutate(neg = as.factor(neg)) %>% 
+  mutate(combination = as.factor(combination))
+
+obj_plot <- sentences %>% 
+  ggplot(aes(x = obj_mentioned, fill = obj_mentioned)) +
+  geom_bar() +
+  theme_classic() +
+  labs(x = 'Direct object is mentioned', y = 'Number of stimuli') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+imp_plot <- sentences %>% 
+  ggplot(aes(x = imp, fill = imp)) +
+  geom_bar() +
+  theme_classic() +
+  labs(x = 'Verb is in the imperative', y = 'Number of stimuli') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+neg_plot <- sentences %>% 
+  ggplot(aes(x = neg, fill = neg)) +
+  geom_bar() +
+  theme_classic() +
+  labs(x = 'Negation is present', y = 'Number of stimuli') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+numb_plot <- sentences %>% 
+  ggplot(aes(x = number, fill = number)) +
+  geom_bar() +
+  theme_classic() +
+  labs(x = 'Number of the verb', y = 'Number of stimuli') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+
+grid.arrange(imp_plot, neg_plot,
+             obj_plot, numb_plot,
+             ncol = 2)
+```
+
+Среди предложений было 16 филлеров:
+
+```{r filler_count}
+sentences %>% 
+  ggplot(aes(x = type, fill = type)) +
+  geom_bar() +
+  theme_classic() +
+  labs(x = 'Sentence type', y = 'Number of sentences') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+```
+
+Среди филлеров половина содержала переходные глаголы, половина - непереходные:
+
+```{r filler_tran}
+sentences %>% 
+  filter(type == 'filler') %>% 
+  ggplot(aes(x = tran, fill = tran)) +
+  geom_bar() +
+  theme_classic() +
+  labs(x = 'Transitivity of the verb', y = 'Number of fillers') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+```
+
+## 2.2. Процедура
+
+Все предложения были разбиты на 4 стимульных листа. В каждом было 16 таргетных предложений и 16 филлеров. Эксперимент проходил в гугл-формах. Участникам нужно было оценить предложение, дав ему оценку на шкале от 1 до 5, где оценка "1" означала, что предложение звучит очень плохо и участник никогда бы так не сказал, а "5" - что предложение звучит отлично и участник мог бы сам так сказать.
+
+## 2.3. Участники
+
+Собиралась следующая информация: возраст, наличие лингвистического образования, город, а также наличие других родных языков помимо русского.
+
+Про участников:
+
+```{r participants}
+participants_info %>% 
+  ggplot(aes(x = `Сколько вам полных лет?`, fill = 'red')) +
+  geom_histogram(binwidth = 0.3) +
+  theme_classic() +
+  labs(x = 'Age', y = 'Number of participants') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+participants_info %>% 
+  ggplot(aes(x = `Есть ли у вас лингвистическое образование?`, fill = `Есть ли у вас лингвистическое образование?`)) +
+  geom_bar() +
+  theme_classic() +
+  labs(x = 'Is the participant a linguist?', y = 'Number of participants') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+participants_info %>% 
+  ggplot(aes(x = `Есть ли у вас другие родные языки, помимо русского?`, fill = `Есть ли у вас другие родные языки, помимо русского?`)) +
+  geom_bar() +
+  theme_classic() +
+  labs(x = 'Does the participant have other native languages?', y = 'Number of participants') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+participants_info %>% 
+  ggplot(aes(x = city_pure, fill = city_pure)) +
+  geom_bar() +
+  theme_classic() +
+  labs(x = 'City', y = 'Number of participants') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+```
+
+# 3. Результаты
+
+Некоторый препроцессинг:
+
+```{r answers_preproc}
+answers_longer <- answers %>% 
+  pivot_longer(cols = 2:129) %>% 
+  rename(sentence = name, score = value)
+
+answers_longer$sentence <- str_replace_all(answers_longer$sentence, regex('...[0-9]+'), '')
+
+summary <- answers_longer %>% 
+  na.omit() %>% 
+  group_by(sentence) %>% 
+  summarize(score = mean(score))
+
+answers_longer <- answers_longer %>% 
+  na.omit()
+
+everything <- merge(answers_longer, participants_info,
+                    by.x = 'participant_id', by.y = 'participant_id') %>% 
+  select(participant_id, sentence, score, `Есть ли у вас лингвистическое образование?`) %>% 
+  rename(is_linguist = `Есть ли у вас лингвистическое образование?`)
+
+everything <- merge(everything, sentences,
+                    by.x = 'sentence', by.y = 'sentence')
+
+targets <- everything %>% 
+  filter(type == 'target')
+
+summary_all <- merge(summary, sentences,
+                     by.x = 'sentence', by.y = 'sentence')
+
+sum_targets <- summary_all %>% 
+  filter(type == 'target') %>% 
+  mutate(obj_mentioned = as.factor(obj_mentioned)) %>% 
+  mutate(imp = as.factor(imp)) %>% 
+  mutate(neg = as.factor(neg)) %>% 
+  mutate(combination = as.factor(combination))
+
+everything
+```
+
+## 3.1. Проверка неинтересных гипотез
+
+Сравнение ответов лингвистов и не-лингвистов:
+
+```{r linguists}
+everything %>% 
+  ggplot(aes(x = is_linguist, y = score, fill = is_linguist)) +
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = 'The participant is linguist', y = 'Scores') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+shapiro.test(filter(everything, is_linguist == 'Да')$score)
+shapiro.test(filter(everything, is_linguist == 'Нет')$score)
+
+wilcox.test(everything$score ~ everything$is_linguist)
+```
+
+Оценки, данные лингвистами и не-лингвистами, значимо различаются (p < 0.001). Лингвисты в среднем оценивают предложения как более грамматичные, чем не-лингвисты.
+
+
+Сравнение филлеров и таргетов:
+
+```{r fillers-targets}
+everything %>% 
+  ggplot(aes(x = type, y = score, fill = type)) +
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = 'Type of sentence (target / filler)', y = 'Scores') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+shapiro.test(filter(everything, type == 'target')$score)
+shapiro.test(filter(everything, type == 'filler')$score)
+
+wilcox.test(filter(everything, type == 'target')$score,
+       filter(everything, type == 'filler')$score,
+       alternative = 'less')
+```
+
+Средняя оценка филлеров значимо выше средней оценки стимулов (p < 0.001).
+
+
+## 3.2. Проверка интересных гипотез
+
+### 3.2.1. Отрицание
+
+```{r neg}
+targets %>% 
+  ggplot(aes(x = neg, y = score, fill = neg)) +
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = 'Negation is present', y = 'Scores') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+shapiro.test(filter(targets, neg == 0)$score)
+shapiro.test(filter(targets, neg == 1)$score)
+
+wilcox.test(filter(targets, neg == 0)$score,
+       filter(targets, neg == 1)$score,
+       alternative = 'less')
+```
+
+Только средние значения для предложений:
+
+```{r neg_aver}
+sum_targets %>% 
+  ggplot(aes(x = neg, y = score, fill = neg)) +
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = 'Negation is present', y = 'Scores') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+shapiro.test(filter(sum_targets, neg == 0)$score)
+shapiro.test(filter(sum_targets, neg == 1)$score)
+
+t.test(filter(sum_targets, neg == 0)$score,
+       filter(sum_targets, neg == 1)$score,
+       alternative = 'less')
+```
+
+Таким образом, наличие отрицания не влияет на приемлемость (p = 0.28 и p = 0.39).
+
+### 3.2.2. Императив
+
+```{r imp}
+targets %>% 
+  ggplot(aes(x = imp, y = score, fill = imp)) +
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = 'Verb is in the imperative', y = 'Scores') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+shapiro.test(filter(targets, imp == 0)$score)
+shapiro.test(filter(targets, imp == 1)$score)
+
+wilcox.test(filter(targets, imp == 0)$score,
+       filter(targets, imp == 1)$score,
+       alternative = 'less')
+```
+
+Только средние значения для предложений:
+
+```{r imp_aver}
+sum_targets %>% 
+  ggplot(aes(x = imp, y = score, fill = imp)) +
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = 'Verb is in the imperative', y = 'Scores') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+shapiro.test(filter(sum_targets, imp == 0)$score)
+shapiro.test(filter(sum_targets, imp == 1)$score)
+
+t.test(filter(sum_targets, imp == 0)$score,
+       filter(sum_targets, imp == 1)$score,
+       alternative = 'less')
+```
+
+Таким образом, наличие императива значимо влияет на приемлемость (p < 0.001 в обоих случаях).
+
+
+### 3.2.3. Упоминание прямого объекта
+
+```{r dobj}
+targets %>% 
+  ggplot(aes(x = obj_mentioned, y = score, fill = obj_mentioned)) +
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = 'Direct object is mentioned', y = 'Scores') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+shapiro.test(filter(targets, obj_mentioned == 0)$score)
+shapiro.test(filter(targets, obj_mentioned == 1)$score)
+
+wilcox.test(filter(targets, obj_mentioned == 0)$score,
+       filter(targets, obj_mentioned == 1)$score,
+       alternative = 'less')
+```
+
+Только средние значения для предложений:
+
+```{r dobj_aver}
+sum_targets %>% 
+  ggplot(aes(x = obj_mentioned, y = score, fill = obj_mentioned)) +
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = 'Direct object is mentioned', y = 'Scores') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+shapiro.test(filter(sum_targets, obj_mentioned == 0)$score)
+shapiro.test(filter(sum_targets, obj_mentioned == 1)$score)
+
+t.test(filter(sum_targets, obj_mentioned == 0)$score,
+       filter(sum_targets, obj_mentioned == 1)$score,
+       alternative = 'less')
+```
+
+Таким образом, наличие упоминания прямого объекта в контексте не влияет на приемлемость (p = 0.84 и p = 0.62).
+
+
+### 3.2.4. Число глагола
+
+```{r number}
+targets %>% 
+  ggplot(aes(x = number, y = score, fill = number)) +
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = 'Number of the verb', y = 'Scores') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+shapiro.test(filter(targets, number == 'sg')$score)
+shapiro.test(filter(targets, number == 'pl')$score)
+
+wilcox.test(filter(targets, number == 'sg')$score,
+       filter(targets, number == 'pl')$score,
+       alternative = 'less')
+```
+
+Только средние значения для предложений:
+
+```{r number_aver}
+sum_targets %>% 
+  ggplot(aes(x = number, y = score, fill = number)) +
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = 'Number of the verb', y = 'Scores') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+shapiro.test(filter(sum_targets, number == 'sg')$score)
+shapiro.test(filter(sum_targets, number == 'pl')$score)
+
+wilcox.test(filter(sum_targets, number == 'sg')$score,
+       filter(sum_targets, number == 'pl')$score,
+       alternative = 'less')
+```
+
+Таким образом, число глагола не влияет на приемлемость (p = 0.40 в обоих случаях).
+
+
+### 3.2.5. Комбинация отрицания и императива: ANOVA
+
+В действительности в данных были 4 комбинации стимулов - +-neg, +-imp. Посмотрим, есть ли между комбинациями значимые различия, и если есть, то между какими из них.
+
+```{r comb}
+targets %>% 
+  ggplot(aes(x = combination, y = score, fill = combination)) +
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = 'Combination', y = 'Scores') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+aov_model <- aov(targets$score ~ targets$combination)
+summary(aov_model)
+TukeyHSD(aov_model)
+
+shapiro.test(residuals(object = aov_model))
+
+kruskal.test(targets$score ~ targets$combination)
+```
+
+Только средние значения для предложений:
+
+```{r comb_aver}
+sum_targets %>% 
+  ggplot(aes(x = combination, y = score, fill = combination)) +
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = 'Combination', y = 'Scores') +
+  theme(axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none")
+
+aov_model_aver <- aov(sum_targets$score ~ sum_targets$combination)
+summary(aov_model_aver)
+TukeyHSD(aov_model_aver)
+
+shapiro.test(residuals(object = aov_model_aver))
+```
+
+Таким образом, значимые различия между комбинациями есть (p < 0.001). Различия видны между всеми парами комбинаций, которые различаются по признаку +-imp.
+
+
+### 3.2.6. Выявление значимых факторов: модели
+
+
+```{r models}
+null_model <- glm(score ~ 1, data = targets)
+step(object = null_model,
+     direction = "forward",
+     scope = score ~ neg + imp + obj_mentioned + number)
+```
+
+Самая лучшая модель - та, что только от императива. Попробуем построить полную модель со всеми предикторами, включая их взаимодействие между собой.
+
+```{r models_full}
+full_model <- lm(score ~ neg * imp * obj_mentioned * number, data = targets)
+summary(full_model)
+```
+
+Помимо императива, значимым предиктором оказывается комбинация "отрицание + наличие упоминания прямого объекта в контексте". Оценки таких предложений оказываются лучше. Посмотрим, что это за предложения:
+
+```{r neg_dobj}
+sentences %>% 
+  filter((type == 'target') & (obj_mentioned == 1) & (neg == 1)) %>% 
+  select(sentence)
+```
+
+Наконец, построим модель со смешанными эффектами участника и предложения:
+
+```{r models_lmer}
+lmer_model <- lmer(score ~ neg * imp * obj_mentioned * number + (1|participant_id) + (1|sent_id),
+                   data = targets)
+summary(lmer_model)
+```
+
+В этой модели только фактор императива оказывается статистически значимым (p = 0.03).
+
+# 4. Заключение
+
+Таким образом, из исследуемых факторов только наличие императива значимо влияет на грамматичность предложений с опущенным прямым объектом. Тем не менее, мы нашли фактор, который регулирует эллипсис прямого объекта в русском языке.
