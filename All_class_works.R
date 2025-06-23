@@ -341,22 +341,3 @@ plot(fit5)
 icelandic_df <- as.data.frame(icelandic1)
 icelandic_df <- within(icelandic_df, sample <- factor(speaker:word))
 
-
-
-
-
-
-
-
-
-data <- data.frame(
-  Color = c('Red', 'Green', 'Blue', 'Green', 'Red'),
-  Price = c(200, 150, 300, 150, 200)
-)
-
-library(lsr)
-cramersV(soc1.chisq$observed)
-
-some_data <- soc1.chisq$observed
-
-cramersV(some_data)
